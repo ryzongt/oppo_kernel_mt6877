@@ -51,6 +51,7 @@ jobs:
                       LLVM=1 \
                       LLVM_IAS=1 \
                       CROSS_COMPILE=aarch64-linux-gnu-
+                      KCFLAGS="-Wframe-larger-than=4096"
 
     - name: Check Artifact
       run: |
