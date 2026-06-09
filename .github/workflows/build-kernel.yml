@@ -1,0 +1,76 @@
+name: Build Kernel 6.6 GKI
+
+on:
+  workflow_dispatch:
+
+env:
+  ARCH: arm64
+  SUBARCH: arm64
+  DEFCONFIG: gki_defconfig
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Kernel Source
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        fetch-depth: 1
+
+    - name: Install Build Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache flex g++-multilib gcc-multilib git gnupg gperf lib32readline-dev lib32z1-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev libncurses6 libtinfo6
+
+    - name: Clone Clang via Sparse Checkout (Fast)
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/toolchains
+        cd $GITHUB_WORKSPACE/toolchains
+        
+        git clone --branch main --single-branch --depth 1 --no-checkout https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 google-clang
+        cd google-clang
+        
+        git sparse-checkout set clang-r522817
+        git checkout
+        
+        mv clang-r522817 ../clang
+        cd ..
+        rm -rf google-clang
+
+    - name: Build Kernel
+      run: |
+        CLANG_BIN="$GITHUB_WORKSPACE/toolchains/clang/bin"
+        export PATH="$CLANG_BIN:$PATH"
+        
+        make O=out ARCH=arm64 $DEFCONFIG
+        
+        make -j$(nproc --all) O=out \
+                      ARCH=arm64 \
+                      LLVM=1 \
+                      LLVM_IAS=1 \
+                      CROSS_COMPILE=aarch64-linux-gnu-
+
+    - name: Check Artifact
+      run: |
+        if [ -f out/arch/arm64/boot/Image ]; then
+            echo "Success! Image found."
+            echo "BUILD_SUCCESS=true" >> $GITHUB_ENV
+            echo "KERNEL_IMAGE=out/arch/arm64/boot/Image" >> $GITHUB_ENV
+        elif [ -f out/arch/arm64/boot/Image.gz ]; then
+            echo "Success! Image.gz found."
+            echo "BUILD_SUCCESS=true" >> $GITHUB_ENV
+            echo "KERNEL_IMAGE=out/arch/arm64/boot/Image.gz" >> $GITHUB_ENV
+        else
+            echo "Error: Kernel image not found!"
+            exit 1
+        fi
+
+    - name: Upload Kernel Artifact
+      if: env.BUILD_SUCCESS == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: Image-Oppo-mt6877
+        path: ${{ env.KERNEL_IMAGE }}
+        
