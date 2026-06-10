@@ -1,1 +1,5 @@
-../../vendor/oplus/kernel/oplus_performance/process_reclaim/process_mm_reclaim_weak.c
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2018-2020 Oplus. All rights reserved.
+ */
+
